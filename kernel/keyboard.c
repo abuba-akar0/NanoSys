@@ -41,6 +41,44 @@ unsigned char kbdus[128] = {
     0,  /* All other keys are undefined */
 };
 
+// Scancode to ASCII lookup table for Shift key pressed
+unsigned char kbdus_shift[128] = {
+    0,  27, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b',   /* Backspace */
+  '\t',                 /* Tab */
+  'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', /* Enter key */
+    0,                  /* 29   - Control */
+  'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~',   0,        /* Left shift */
+  '|', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?',   0,              /* Right shift */
+  '*',
+    0,  /* Alt */
+  ' ',  /* Space bar */
+    0,  /* Caps lock */
+    0,  /* 59 - F1 key ... > */
+    0,   0,   0,   0,   0,   0,   0,   0,
+    0,  /* < ... F10 */
+    0,  /* 69 - Num lock*/
+    0,  /* Scroll Lock */
+    0,  /* Home key */
+    0,  /* Up Arrow */
+    0,  /* Page Up */
+  '-',
+    0,  /* Left Arrow */
+    0,
+    0,  /* Right Arrow */
+  '+',
+    0,  /* 79 - End key*/
+    0,  /* Down Arrow */
+    0,  /* Page Down */
+    0,  /* Insert Key */
+    0,  /* Delete Key */
+    0,   0,   0,
+    0,  /* F11 Key */
+    0,  /* F12 Key */
+    0,  /* All other keys are undefined */
+};
+
+static int shift_pressed = 0;
+
 // The generic ISR handler called from assembly
 // In a real OS, this would be in a separate 'isr.c' file
 // and would dispatch based on interrupt number.
@@ -54,15 +92,27 @@ void isr_handler(void) {
         // Read scancode from data port
         unsigned char scancode = inb(0x60);
 
-        // If the top bit is set, it's a "break code" (key release)
-        // We only care about "make codes" (key press) for now
-        if (!(scancode & 0x80)) {
-            // Convert to ASCII
-            char c = kbdus[scancode];
-            
-            // Send to kernel input handler
-            if (c != 0) {
-                keyboard_input(c);
+        // Check for Shift key press/release
+        if (scancode == 0x2A || scancode == 0x36) {
+            shift_pressed = 1;
+        } else if (scancode == 0xAA || scancode == 0xB6) {
+            shift_pressed = 0;
+        } else {
+            // If the top bit is set, it's a "break code" (key release)
+            // We only care about "make codes" (key press) for now
+            if (!(scancode & 0x80)) {
+                // Convert to ASCII
+                char c;
+                if (shift_pressed) {
+                    c = kbdus_shift[scancode];
+                } else {
+                    c = kbdus[scancode];
+                }
+                
+                // Send to kernel input handler
+                if (c != 0) {
+                    keyboard_input(c);
+                }
             }
         }
     }
